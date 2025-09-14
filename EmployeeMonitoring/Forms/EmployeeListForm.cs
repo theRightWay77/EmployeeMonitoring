@@ -91,6 +91,9 @@ namespace EmployeeMonitoring.Models.Forms
                 var employees = GetDataView(persons);
                 var bindingList = employees;
                 bindingSource.DataSource = bindingList;
+
+                dataGridViewEmployees.Refresh();
+                HighlightDismissedEmployees();
             }
             catch (Exception ex)
             {
@@ -294,6 +297,46 @@ namespace EmployeeMonitoring.Models.Forms
             }
             
         }
+        #endregion
+
+        #region legend
+
+        private void HighlightDismissedEmployees()
+        {
+            try
+            {
+                if (dataGridViewEmployees.Rows.Count == 0)
+                    return;
+
+                foreach (DataGridViewRow row in dataGridViewEmployees.Rows)
+                {
+                    var statusCell = row.Cells["StatusName"];
+                    if (statusCell.Value != null &&
+                        (statusCell.Value.ToString().Contains("Уволен") ||
+                         statusCell.Value.ToString().Contains("Уволен по собственному желанию")))
+                    {
+                        var fullNameCell = row.Cells["FullName"];
+                        fullNameCell.Style.BackColor = Color.FromArgb(255, 200, 200);
+                    }
+                    else
+                    {
+                        var fullNameCell = row.Cells["FullName"];
+                        fullNameCell.Style.BackColor = dataGridViewEmployees.DefaultCellStyle.BackColor;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка выделения увеленных: {ex.Message}");
+            }
+
+        }
+
+        private void DataGridViewEmployees_Change(object sender, EventArgs e)
+        {
+            HighlightDismissedEmployees();
+        }
+
         #endregion
         private void InitializeComponent()
         {
