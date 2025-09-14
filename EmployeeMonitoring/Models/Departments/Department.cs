@@ -8,6 +8,9 @@ using System.Threading.Tasks;
 
 namespace EmployeeMonitoring.Models.Departments
 {
+    /// <summary>
+    /// Отделы в компании.
+    /// </summary>
     public class Department
     {
         [Column("id")]

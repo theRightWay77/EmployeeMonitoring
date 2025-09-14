@@ -20,5 +20,10 @@ namespace EmployeeMonitoring
         {
             return appDbContext.Departments.ToList();
         }
+        
+        public List<string> GetAllNames()
+        {
+            return appDbContext.Departments.Select(d => d.Name).ToList();
+        }
     }
 }

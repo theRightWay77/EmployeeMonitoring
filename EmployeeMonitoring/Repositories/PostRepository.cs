@@ -16,5 +16,10 @@ namespace EmployeeMonitoring.Repositories
         {
             return appDbContext.Posts.ToList();
         }
+        
+        public List<string> GetAllNames()
+        {
+            return appDbContext.Posts.Select(p => p.Name).ToList();
+        }
     }
 }

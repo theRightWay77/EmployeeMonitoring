@@ -1,5 +1,6 @@
 ﻿using EmployeeMonitoring.Models.Forms;
 using System;
+using System.Configuration;
 using System.Windows.Forms;
 
 namespace EmployeeMonitoring
@@ -15,7 +16,9 @@ namespace EmployeeMonitoring
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            DatabaseInitializer.InitializeDatabase();
+            string connectionString = ConfigurationManager.ConnectionStrings["DatabaseConnectionString"].ConnectionString;
+
+            DatabaseInitializer.InitializeDatabase(connectionString);
 
             Application.Run(new EmployeeListForm());
         }

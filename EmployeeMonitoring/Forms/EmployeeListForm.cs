@@ -1,11 +1,11 @@
 ﻿using EmployeeMonitoring.Helpers;
 using EmployeeMonitoring.Models.DTO;
 using EmployeeMonitoring.Models.Persons;
+using EmployeeMonitoring.Repositories;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
-using System.Linq;
 using System.Windows.Forms;
 
 namespace EmployeeMonitoring.Models.Forms
@@ -16,16 +16,20 @@ namespace EmployeeMonitoring.Models.Forms
         private BindingSource bindingSource;
         private readonly PersonsRepository personsRepository;
         private readonly StatusRepository statusRepository;
+        private readonly PostRepository postRepository;
+        private readonly DepartmentRepository departmentRepository;
 
         private ComboBox comboBoxStatus;
         private ComboBox comboBoxDepartment;
-        private ComboBox comboBoxPosition;
+        private ComboBox comboBoxPost;
         private TextBox textBoxLastNameFilter;
 
         public EmployeeListForm()
         {
             personsRepository = new PersonsRepository();
             statusRepository = new StatusRepository();
+            postRepository = new PostRepository();
+            departmentRepository = new DepartmentRepository();
 
             InitializeComponent();
             SetupControls();
@@ -91,15 +95,6 @@ namespace EmployeeMonitoring.Models.Forms
         }
         private void SetupControls()
         {
-            Panel sortPanel = new Panel
-            {
-                Height = 60, 
-                Dock = DockStyle.Top,
-                BackColor = SystemColors.Control
-            };
-
-            AddSortButtons(sortPanel);
-
             if (dataGridViewEmployees == null)
             {
                 dataGridViewEmployees = new DataGridView
@@ -176,59 +171,9 @@ namespace EmployeeMonitoring.Models.Forms
                 mainPanel.Controls.Add(dataGridViewEmployees);
 
                 this.Controls.Add(mainPanel);
-                this.Controls.Add(sortPanel);
                 this.Controls.Add(GetFiltersPanel());
             }
         }
-        #region sorting
-        private void AddSortButtons(Panel sortPanel)
-        {
-            FlowLayoutPanel flowPanel = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = false,
-                Padding = new Padding(5),
-                AutoScroll = false
-            };
-
-            var buttons = new Button[]
-            {
-                new Button { Text = "По ФИО", Size = new Size(100, 25), Tag = "FullName" },
-                new Button { Text = "По статусу", Size = new Size(100, 25), Tag = "StatusName" },
-                new Button { Text = "По отделу", Size = new Size(100, 25), Tag = "DepartmentName" },
-                new Button { Text = "По должности", Size = new Size(120, 25), Tag = "PositionName" },
-                new Button { Text = "По дате приема", Size = new Size(120, 25), Tag = "DateEmploy" },
-                new Button { Text = "По дате увольнения", Size = new Size(140, 25), Tag = "DateUneploy" },
-                new Button { Text = "Сброс", Size = new Size(80, 25), Tag = "Clear" }
-            };
-
-            foreach (var button in buttons)
-            {
-                if (button.Tag.ToString() == "Clear")
-                    button.Click += ClearSort;
-                else
-                    button.Click += SortButton_Click;
-            }
-
-            flowPanel.Controls.AddRange(buttons);
-            sortPanel.Controls.Add(flowPanel);
-        }
-       
-        private void SortButton_Click(object sender, EventArgs e)
-        {
-            Button button = sender as Button;
-            string fieldName = button.Tag.ToString();
-
-            bindingSource.Sort = $"{fieldName} ASC";
-            
-        }
-        private void ClearSort(object sender, EventArgs e)
-        {
-            bindingSource.RemoveSort();
-        }
-
-        #endregion
         #region filters
 
         private Panel GetFiltersPanel() 
@@ -253,30 +198,45 @@ namespace EmployeeMonitoring.Models.Forms
             comboBoxStatus.SelectedIndexChanged += StatusFilterChanged;
 
             Label lblDepartment = new Label { Text = "Отдел:", Location = new System.Drawing.Point(200, 15), Width = 50 };
+            var deps = new List<string> { "Все отделы" };
+            deps.AddRange(departmentRepository.GetAllNames());
             comboBoxDepartment = new ComboBox
             {
                 Location = new System.Drawing.Point(255, 12),
                 Width = 120,
-                DropDownStyle = ComboBoxStyle.DropDownList
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                DataSource = deps
             };
-            //comboBoxDepartment.SelectedIndexChanged += FilterChanged;
+            comboBoxDepartment.SelectedIndexChanged += DepFilterChanged;
 
             Label lblPosition = new Label { Text = "Должность:", Location = new System.Drawing.Point(400, 15), Width = 70 };
-            comboBoxPosition = new ComboBox
+            var posts = new List<string> { "Все должности" };
+            posts.AddRange(postRepository.GetAllNames());
+            comboBoxPost = new ComboBox
             {
                 Location = new System.Drawing.Point(475, 12),
                 Width = 120,
-                DropDownStyle = ComboBoxStyle.DropDownList
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                DataSource = posts
             };
-            //comboBoxPosition.SelectedIndexChanged += FilterChanged;
+            comboBoxPost.SelectedIndexChanged += PostFilterChanged;
 
             Label lblLastName = new Label { Text = "Фамилия:", Location = new System.Drawing.Point(10, 45), Width = 60 };
+            
             textBoxLastNameFilter = new TextBox
             {
                 Location = new System.Drawing.Point(75, 42),
                 Width = 120
             };
-            //textBoxLastNameFilter.TextChanged += FilterChanged;
+            
+
+            var buttonSearch = new Button
+            {
+                Text = "Поиск",
+                Location = new System.Drawing.Point(235, 42),
+                Width = 120
+            };
+            buttonSearch.Click += SearchBySecondName;
 
             var buttonClearFilters = new Button
             {
@@ -289,8 +249,9 @@ namespace EmployeeMonitoring.Models.Forms
             filterPanel.Controls.AddRange(new Control[] {
                 lblStatus, comboBoxStatus,
                 lblDepartment, comboBoxDepartment,
-                lblPosition, comboBoxPosition,
+                lblPosition, comboBoxPost,
                 lblLastName, textBoxLastNameFilter,
+                buttonSearch
                 //buttonClearFilters
             });
 
@@ -305,6 +266,49 @@ namespace EmployeeMonitoring.Models.Forms
             filteredList = val == "Все статусы" ? personsRepository.GetPersons() : personsRepository.GetByStatus(val);
             
             LoadData(GetDataView(filteredList));
+        }
+        
+        private void DepFilterChanged(object sender, EventArgs e)
+        {
+            string val = comboBoxDepartment.SelectedValue.ToString();
+
+            var filteredList = new List<Person>();
+
+            filteredList = val == "Все отделы" ? personsRepository.GetPersons() : personsRepository.GetByDep(val);
+            
+            LoadData(GetDataView(filteredList));
+        }
+        
+        private void PostFilterChanged(object sender, EventArgs e)
+        {
+            string val = comboBoxPost.SelectedValue.ToString();
+
+            var filteredList = new List<Person>();
+
+            filteredList = val == "Все должности" ? personsRepository.GetPersons() : personsRepository.GetByPost(val);
+            
+            LoadData(GetDataView(filteredList));
+        }
+
+        private void SearchBySecondName(object sender, EventArgs e)
+        {
+            string val = textBoxLastNameFilter.Text.ToString();
+
+            if (string.IsNullOrEmpty(val))
+            {
+                LoadData(GetDataView(personsRepository.GetPersons()));
+            }
+            
+            var persons = personsRepository.GetBySecondName(val);
+
+            if (persons.Count > 0)
+            {
+                LoadData(GetDataView(persons));
+            }
+            else {
+                LoadData(new DataView());
+            }
+            
         }
         #endregion
         private void InitializeComponent()

@@ -10,6 +10,12 @@ namespace EmployeeMonitoring
     {
         public AppDbContext() : base("name=DatabaseConnectionString")
         {
+            Database.SetInitializer<AppDbContext>(null);
+        }
+
+        public AppDbContext(string connectionString)  : base(connectionString) 
+        {
+            Database.SetInitializer<AppDbContext>(null);
         }
 
         public DbSet<Department> Departments {  get; set; }

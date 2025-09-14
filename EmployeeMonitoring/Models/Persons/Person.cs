@@ -6,6 +6,9 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace EmployeeMonitoring.Models.Persons
 {
+    /// <summary>
+    /// Сотрудники.
+    /// </summary>
     public class Person
     {
         [Column("id")]

@@ -4,6 +4,9 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace EmployeeMonitoring.Models.Statuses
 {
+    /// <summary>
+    /// Статусы сотрудников.
+    /// </summary>
     public class Status
     {
         [Column("id")]

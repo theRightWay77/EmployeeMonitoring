@@ -1,7 +1,4 @@
-﻿using EmployeeMonitoring.Models.Departments;
-using EmployeeMonitoring.Models.Persons;
-using EmployeeMonitoring.Models.Posts;
-using EmployeeMonitoring.Models.Statuses;
+﻿using Npgsql;
 using System;
 using System.Linq;
 using System.Windows.Forms;
@@ -10,19 +7,15 @@ namespace EmployeeMonitoring
 {
     public static class DatabaseInitializer
     {
-        public static void InitializeDatabase()
+        public static void InitializeDatabase(string connectionString)
         {
             try
             {
-                using (var context = new AppDbContext())
-                {
-                    if (!context.Database.Exists())
-                    {
-                        context.Database.Create();
-                    }
+                CreateDatabaseIfNotExists(connectionString, "EmpMon");
 
-                    CreateTablesIfNotExists(context);
-                }
+                CreateTablesIfNotExists(connectionString, "EmpMon");
+
+                SeedDataIfNotExists(connectionString);
             }
             catch (Exception ex)
             {
@@ -30,19 +23,62 @@ namespace EmployeeMonitoring
             }
         }
 
-        private static void CreateTablesIfNotExists(AppDbContext context)
+        private static void CreateDatabaseIfNotExists(string connectionString, string databaseName)
         {
             try
             {
-                var tableExists = context.Database.SqlQuery<int>(@"
+                var builder = new NpgsqlConnectionStringBuilder(connectionString);
+                builder.Database = "postgres"; 
+                string serverConnectionString = builder.ToString();
+
+                using (var connection = new NpgsqlConnection(serverConnectionString))
+                {
+                    connection.Open();
+
+                    using (var command = new NpgsqlCommand(
+                        "SELECT 1 FROM pg_database WHERE datname = @databaseName", connection))
+                    {
+                        command.Parameters.AddWithValue("databaseName", databaseName);
+
+                        var result = command.ExecuteScalar();
+
+                        if (result == null)
+                        {
+                            using (var createCommand = new NpgsqlCommand(
+                                $"CREATE DATABASE \"{databaseName}\"", connection))
+                            {
+                                createCommand.ExecuteNonQuery();
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка создания базы данных: {ex.Message}");
+                throw;
+            }
+        }
+
+        private static void CreateTablesIfNotExists(string connectionString, string databaseName)
+        {
+            try
+            {
+                var builder = new NpgsqlConnectionStringBuilder(connectionString);
+                builder.Database = databaseName;
+                string dbConnectionString = builder.ToString();
+
+                using (var context = new AppDbContext(dbConnectionString))
+                {
+                    var tableExists = context.Database.SqlQuery<int>(@"
                 SELECT COUNT(*) FROM information_schema.tables 
                 WHERE table_schema = 'public' 
                 AND table_name IN ('status', 'deps', 'posts', 'persons')"
-                ).FirstOrDefault();
+                    ).FirstOrDefault();
 
-                if (tableExists < 4)
-                {
-                    var createTablesSql = @"
+                    if (tableExists < 4)
+                    {
+                        var createTablesSql = @"
                     CREATE TABLE IF NOT EXISTS public.status (
                         id SERIAL PRIMARY KEY,
                         name VARCHAR(100) NOT NULL
@@ -70,68 +106,85 @@ namespace EmployeeMonitoring
                         post_id INTEGER REFERENCES public.posts(id)
                     );";
 
-                    context.Database.ExecuteSqlCommand(createTablesSql);
+                        context.Database.ExecuteSqlCommand(createTablesSql);
+                    }
                 }
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Ошибка создания таблиц: {ex.Message}");
+                throw;
             }
         }
 
-        //private static void SeedData(AppDbContext context)
-        //{
-        //    try
-        //    {
-        //        if (context.Statuses.Any()) return;
+        private static void SeedDataIfNotExists(string connectionString)
+        {
+            try
+            {
+                using (var context = new AppDbContext(connectionString))
+                {
+                    var personsCount = context.Database.SqlQuery<int>("SELECT COUNT(*) FROM public.persons").FirstOrDefault();
 
-        //        var statuses = new[]
-        //        {
-        //        new Status { Name = "Работает" },
-        //        new Status { Name = "Уволен" },
-        //        new Status { Name = "В отпуске" }
-        //    };
-        //        context.Statuses.AddRange(statuses);
+                    if (personsCount == 0)
+                    {
+                        var insertStatusSql = @"
+                INSERT INTO public.status (name) VALUES 
+                ('Работает'),
+                ('Уволен'),
+                ('В отпуске'),
+                ('Уволен по собственному желанию');";
+                        context.Database.ExecuteSqlCommand(insertStatusSql);
 
-        //        var deps = new[]
-        //        {
-        //        new Department { Name = "IT отдел" },
-        //        new Department { Name = "Бухгалтерия" },
-        //        new Department { Name = "Отдел кадров" }
-        //    };
-        //        context.Departments.AddRange(deps);
+                        var insertDepsSql = @"
+                INSERT INTO public.deps (name) VALUES 
+                ('IT отдел'),
+                ('Бухгалтерия'),
+                ('Отдел кадров'),
+                ('Отдел продаж'),
+                ('Маркетинговый отдел'),
+                ('Отдел логистики'),
+                ('Производственный отдел'),
+                ('Отдел закупок'),
+                ('Юридический отдел'),
+                ('Отдел контроля качества');";
+                        context.Database.ExecuteSqlCommand(insertDepsSql);
 
-        //        var posts = new[]
-        //        {
-        //        new Post { Name = "Программист" },
-        //        new Post { Name = "Бухгалтер" },
-        //        new Post { Name = "HR-менеджер" }
-        //    };
-        //        context.Posts.AddRange(posts);
+                        var insertPostsSql = @"
+                INSERT INTO public.posts (name) VALUES 
+                ('Программист'),
+                ('Бухгалтер'),
+                ('HR-менеджер'),
+                ('Менеджер по продажам'),
+                ('Маркетолог'),
+                ('Логист'),
+                ('Инженер'),
+                ('Менеджер по закупкам'),
+                ('Юрист'),
+                ('Технолог');";
+                        context.Database.ExecuteSqlCommand(insertPostsSql);
 
-        //        context.SaveChanges();
+                        var insertPersonsSql = @"
+                INSERT INTO public.persons (second_name, first_name, last_name, date_employ, date_uneploy, status_id, dep_id, post_id) VALUES
+                ('Иванов', 'Иван', 'Иванович', '2023-01-15', NULL, 1, 1, 1),
+                ('Петров', 'Петр', 'Петрович', '2022-03-20', NULL, 1, 2, 2),
+                ('Сидорова', 'Мария', 'Сергеевна', '2023-05-10', NULL, 1, 3, 3),
+                ('Козлова', 'Анна', 'Александровна', '2022-08-12', '2023-12-01', 2, 4, 4),
+                ('Морозов', 'Сергей', 'Викторович', '2023-02-28', NULL, 1, 5, 5),
+                ('Новикова', 'Елена', 'Викторовна', '2021-11-05', NULL, 1, 6, 6),
+                ('Волков', 'Дмитрий', 'Алексеевич', '2023-07-14', NULL, 3, 7, 7),
+                ('Кузнецова', 'Ольга', 'Николаевна', '2022-09-18', NULL, 1, 8, 8),
+                ('Зайцев', 'Андрей', 'Борисович', '2023-04-22', NULL, 1, 9, 9),
+                ('Смирнова', 'Татьяна', 'Михайловна', '2021-12-30', '2023-11-15', 4, 10, 10);";
+                        context.Database.ExecuteSqlCommand(insertPersonsSql);
 
-        //        var persons = new[]
-        //        {
-        //        new Person
-        //        {
-        //            FirstName = "Иван",
-        //            SecondName = "Иванович",
-        //            LastName = "Иванов",
-        //            DateEmploy = new DateTime(2023, 1, 15),
-        //            StatusId = 1,
-        //            DepId = 1,
-        //            PostId = 1
-        //        }
-        //    };
-        //        context.Persons.AddRange(persons);
-
-        //        context.SaveChanges();
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        MessageBox.Show($"Ошибка заполнения данными: {ex.Message}");
-        //    }
-        //}
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка создания таблиц: {ex.Message}");
+                throw;
+            }
+        }
     }
 }

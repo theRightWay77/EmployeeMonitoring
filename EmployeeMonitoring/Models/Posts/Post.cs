@@ -8,6 +8,9 @@ using System.Threading.Tasks;
 
 namespace EmployeeMonitoring.Models.Posts
 {
+    /// <summary>
+    /// Должности.
+    /// </summary>
     public class Post
     {
         [Column("id")]
