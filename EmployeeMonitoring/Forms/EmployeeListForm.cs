@@ -30,10 +30,11 @@ namespace EmployeeMonitoring.Models.Forms
             statusRepository = new StatusRepository();
             postRepository = new PostRepository();
             departmentRepository = new DepartmentRepository();
+            bindingSource = new BindingSource();
 
             InitializeComponent();
             SetupControls();
-            LoadData(GetDataView(personsRepository.GetPersons()));
+            LoadData(personsRepository.GetPersons());
 
             this.Size = new Size(1000, 600);
             this.StartPosition = FormStartPosition.CenterScreen;
@@ -54,6 +55,7 @@ namespace EmployeeMonitoring.Models.Forms
                 return new DataView();
             }
         }
+
         private DataView CreateDataViewFromEmployees(List<EmployeeDisplayModel> employees)
         {
             DataTable dataTable = new DataTable("Employees");
@@ -81,10 +83,12 @@ namespace EmployeeMonitoring.Models.Forms
 
             return dataTable.DefaultView;
         }
-        private void LoadData(DataView employees)
+
+        private void LoadData(List<Person> persons)
         {
             try
             {
+                var employees = GetDataView(persons);
                 var bindingList = employees;
                 bindingSource.DataSource = bindingList;
             }
@@ -111,32 +115,28 @@ namespace EmployeeMonitoring.Models.Forms
                 {
                     DataPropertyName = "FullName",
                     HeaderText = "ФИО",
-                    Width = 200,
-                    SortMode = DataGridViewColumnSortMode.Automatic
+                    Width = 200
                 });
 
                 dataGridViewEmployees.Columns.Add(new DataGridViewTextBoxColumn
                 {
                     DataPropertyName = "StatusName",
                     HeaderText = "Статус",
-                    Width = 100,
-                    SortMode = DataGridViewColumnSortMode.Automatic
+                    Width = 100
                 });
 
                 dataGridViewEmployees.Columns.Add(new DataGridViewTextBoxColumn
                 {
                     DataPropertyName = "DepartmentName",
                     HeaderText = "Отдел",
-                    Width = 150,
-                    SortMode = DataGridViewColumnSortMode.Automatic
+                    Width = 150
                 });
 
                 dataGridViewEmployees.Columns.Add(new DataGridViewTextBoxColumn
                 {
                     DataPropertyName = "PositionName",
                     HeaderText = "Должность",
-                    Width = 150,
-                    SortMode = DataGridViewColumnSortMode.Automatic
+                    Width = 150
                 });
 
                 dataGridViewEmployees.Columns.Add(new DataGridViewTextBoxColumn
@@ -144,8 +144,7 @@ namespace EmployeeMonitoring.Models.Forms
                     DataPropertyName = "DateEmploy",
                     HeaderText = "Дата приема",
                     Width = 100,
-                    DefaultCellStyle = new DataGridViewCellStyle { Format = "dd.MM.yyyy" },
-                    SortMode = DataGridViewColumnSortMode.Automatic
+                    DefaultCellStyle = new DataGridViewCellStyle { Format = "dd.MM.yyyy" }
                 });
 
                 dataGridViewEmployees.Columns.Add(new DataGridViewTextBoxColumn
@@ -153,14 +152,8 @@ namespace EmployeeMonitoring.Models.Forms
                     DataPropertyName = "DateUneploy",
                     HeaderText = "Дата увольнения",
                     Width = 100,
-                    DefaultCellStyle = new DataGridViewCellStyle { Format = "dd.MM.yyyy" },
-                    SortMode = DataGridViewColumnSortMode.Automatic
+                    DefaultCellStyle = new DataGridViewCellStyle { Format = "dd.MM.yyyy" }
                 });
-
-                if (bindingSource == null)
-                {
-                    bindingSource = new BindingSource();
-                }
 
                 dataGridViewEmployees.DataSource = bindingSource;
 
@@ -238,21 +231,12 @@ namespace EmployeeMonitoring.Models.Forms
             };
             buttonSearch.Click += SearchBySecondName;
 
-            var buttonClearFilters = new Button
-            {
-                Text = "Очистить фильтры",
-                Location = new System.Drawing.Point(200, 40),
-                Width = 120
-            };
-           // buttonClearFilters.Click += ClearFilters;
-
             filterPanel.Controls.AddRange(new Control[] {
                 lblStatus, comboBoxStatus,
                 lblDepartment, comboBoxDepartment,
                 lblPosition, comboBoxPost,
                 lblLastName, textBoxLastNameFilter,
                 buttonSearch
-                //buttonClearFilters
             });
 
             return filterPanel;
@@ -265,7 +249,7 @@ namespace EmployeeMonitoring.Models.Forms
 
             filteredList = val == "Все статусы" ? personsRepository.GetPersons() : personsRepository.GetByStatus(val);
             
-            LoadData(GetDataView(filteredList));
+            LoadData(filteredList);
         }
         
         private void DepFilterChanged(object sender, EventArgs e)
@@ -276,7 +260,7 @@ namespace EmployeeMonitoring.Models.Forms
 
             filteredList = val == "Все отделы" ? personsRepository.GetPersons() : personsRepository.GetByDep(val);
             
-            LoadData(GetDataView(filteredList));
+            LoadData(filteredList);
         }
         
         private void PostFilterChanged(object sender, EventArgs e)
@@ -287,7 +271,7 @@ namespace EmployeeMonitoring.Models.Forms
 
             filteredList = val == "Все должности" ? personsRepository.GetPersons() : personsRepository.GetByPost(val);
             
-            LoadData(GetDataView(filteredList));
+            LoadData(filteredList);
         }
 
         private void SearchBySecondName(object sender, EventArgs e)
@@ -296,17 +280,17 @@ namespace EmployeeMonitoring.Models.Forms
 
             if (string.IsNullOrEmpty(val))
             {
-                LoadData(GetDataView(personsRepository.GetPersons()));
+                LoadData(personsRepository.GetPersons());
             }
             
             var persons = personsRepository.GetBySecondName(val);
 
             if (persons.Count > 0)
             {
-                LoadData(GetDataView(persons));
+                LoadData(persons);
             }
             else {
-                LoadData(new DataView());
+                LoadData(new List<Person>());
             }
             
         }
